@@ -94,6 +94,9 @@ doctype_list_js = {"Purchase Invoice" : "public/js/purchase_invoice_list.js"}
 doc_events = {
 	"Sales Invoice": {
 		"validate": "speedex.speedex.doctype.sales_invoice.validate"
+	},
+	"Purchase Invoice": {
+		"validate": "speedex.speedex.doctype.purchase_invoice.validate"
 	}
 }
 
@@ -105,9 +108,6 @@ scheduler_events = {
 		"speedex.dump_data.data_entry",
         "speedex.dump_data.payment_entry"
 	],
-	"Purchase Invoice": {
-		"validate": "speedex.speedex.doctype.purchase_invoice.validate"
-	}
 }
 
 # Testing
