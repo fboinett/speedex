@@ -105,6 +105,9 @@ scheduler_events = {
 		"speedex.dump_data.data_entry",
         "speedex.dump_data.payment_entry"
 	],
+	"Purchase Invoice": {
+		"validate": "speedex.speedex.doctype.purchase_invoice.validate"
+	}
 }
 
 # Testing
