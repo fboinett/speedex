@@ -106,7 +106,8 @@ doc_events = {
 scheduler_events = {
 	"hourly": [
 		"speedex.dump_data.data_entry",
-        "speedex.dump_data.payment_entry"
+        "speedex.dump_data.payment_entry",
+        "speedex.dump_data.sales_entry",
 	],
 }
 
