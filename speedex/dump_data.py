@@ -12,17 +12,17 @@ def data_entry():
     if type(r.content)==bytes:
        op=(r.content).decode("utf-8")
     item_list = json.loads(op)
-    all_pi = frappe.get_all("Purchase Invoice", ["ref_no"])
+    all_pi = frappe.get_all("Purchase Invoice", ["sea_id"])
     import datetime
     for pi in all_pi:
-        ref_list.append(pi.get('ref_no')) 
+        ref_list.append(pi.get('sea_id')) 
     for item in item_list:
         datetime_obj = datetime.datetime.strptime(item.get('payment_date'), '%d/%m/%Y')
         customer=''
         for cu in frappe.get_all('Customer',{'client_id':item.get('client_id')}):
             customer=cu.name
-        if item.get('ref') not in ref_list :
-            ref_list.append(item.get('ref'))
+        if item.get('sea_id') not in ref_list :
+            ref_list.append(item.get('sea_id'))
             pi_doc = frappe.get_doc({
                 "doctype" : "Purchase Invoice",
                 "company" : "Speedex Logistics Limited",
@@ -73,6 +73,82 @@ def data_entry():
                     gl.debit_in_account_currency=d.amount
                     gl.insert()
                     gl.submit()
+        frappe.db.commit()
+    return 'OK'
+
+# bench execute speedex.dump_data.sales_entry
+def sales_entry():
+    ref_list = []
+    r = requests.get('https://speedexlogistics.com/s/api/accounts/sea/cheque_payment/list.php',
+    headers={'sessionID': '1'}) 
+    op=r.content
+    if type(r.content)==bytes:
+       op=(r.content).decode("utf-8")
+    item_list = json.loads(op)
+    all_pi = frappe.get_all("Sales Invoice", ["sea_id"])
+    import datetime
+    for pi in all_pi:
+        ref_list.append(pi.get('sea_id')) 
+    for item in item_list:
+        datetime_obj = datetime.datetime.strptime(item.get('payment_date'), '%d/%m/%Y')
+        customer=''
+        d_date='26/02/2021'
+        datetime_obj2 = datetime.datetime.strptime(d_date, '%d/%m/%Y')
+        for cu in frappe.get_all('Customer',{'client_id':item.get('client_id')}):
+            customer=cu.name
+        if item.get('sea_id') not in ref_list :
+            ref_list.append(item.get('sea_id'))
+            pi_doc = frappe.get_doc({
+                "doctype" : "Sales Invoice",
+                "company" : "Speedex Logistics Limited",
+                "naming_series":"SPX-DN.-.####",                
+                "posting_date":datetime_obj.date(),
+                "due_date":datetime_obj2.date(),
+                "customer":customer,
+                "description":"CUSTOMS ENTRY THIRDPARTY CHARGES",
+                "ref_no" : item.get('ref'),
+                "sea_id" : item.get('sea_id'),
+
+            })
+            for i in item.get('items'):
+                for my_item in i.keys():
+                    q = "select income_account from `tabItem Default` where parent ='{0}';".format(my_item)
+                    income_acc = frappe.db.sql(q)
+                    for ip in frappe.get_all('Item Price',{'item_code':my_item,'selling':1}):
+                        item_price=frappe.get_doc('Item Price',ip.name)
+                        item_price.price_list_rate=i[my_item]
+                        item_price.save()
+                    pi_doc.append("items",{
+                        "item_code": my_item,
+                        "item_name": frappe.db.get_value('Item',my_item,'item_name'),
+                        "qty" : 1,
+                        "income_account" :income_acc[0][0] if income_acc and income_acc[0][0] else "Missing Item Acc - SLL" ,
+                        "uom" : "Nos",
+                        "rate":i[my_item]
+                    })
+                  
+            pi_doc.insert()     
+            pi_doc.submit()
+            frappe.db.set_value('Sales Invoice',pi_doc.name,'posting_date',datetime_obj.date())
+            frappe.db.set_value('Sales Invoice',pi_doc.name,'due_date',datetime_obj.date())
+            for d in frappe.get_all('GL Entry',{'voucher_type':'Sales Invoice','account':('!=','Debtors - SLL'),'voucher_no':pi_doc.name},['name','docstatus']):
+                doc=frappe.get_doc('GL Entry',d.name)
+                if d.docstatus==1:
+                    doc.cancel()
+                frappe.delete_doc("GL Entry",doc.name)
+            for d in pi_doc.get('items'):
+                account=frappe.db.get_value('Item',d.item_code,'gl_entry__account_of_api')
+                if account and d.amount>0:
+                    gl=frappe.new_doc("GL Entry")
+                    gl.posting_date=pi_doc.posting_date
+                    gl.voucher_type="Sales Invoice"
+                    gl.voucher_no=pi_doc.name
+                    gl.account=account
+                    gl.credit=d.amount
+                    gl.credit_in_account_currency=d.amount
+                    gl.insert()
+                    gl.submit()
+        frappe.db.commit()
     return 'OK'
 
 # bench execute speedex.dump_data.payment_entry
@@ -116,6 +192,7 @@ def payment_entry():
                 })
                 pe_doc.insert()
                 pe_doc.submit()
+        frappe.db.commit()
     return 'OK'
 
 
